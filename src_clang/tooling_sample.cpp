@@ -107,6 +107,14 @@ private:
   MyASTVisitor Visitor;
 };
 
+/*
+MyFrontendAction is very simple. All it does is provide our custom AST consumer in CreateASTConsumer and sets up the Rewriter. Note that ClangTool
+ will create a new MyFrontendAction instance per file, so it's correct to have a new Rewriter in each instance. This is enabled by adding another
+ layer of abstraction - the FrontendActionFactory. The factory pattern here is used to decouple the process of creating objects implementing
+ FrontendAction from the concrete FrontendAction subclasses used by our tool. It also lets us customize the creation process to a greater extent
+ - for example passing additional information into each MyFrontendAction object. In our sample, advanced features aren't really needed so we use
+ the convenience newFrontendActionFactory template which creates a basic factory behind the scenes.
+ */
 // For each source file provided to the tool, a new FrontendAction is created.
 class MyFrontendAction : public ASTFrontendAction {
 public:
@@ -131,6 +139,16 @@ private:
   Rewriter TheRewriter;
 };
 
+/*
+ With libTooling, we no longer need to laboriously set up an instance of the compiler front-end manually. The ClangTool class does it all for us,
+ while CommonOptionsParser simplifies the command-line interface of the tool. All we need is to implement a FrontendAction - a very central
+ abstraction within Clang for entities that produce stuff from the parsed AST.
+
+ libTooling has the concept of a compilation database, which tells tools about the compiler options used to build the sources under consideration.
+
+ The libTooling command-line parser (CommonOptionsParser) supports providing compiler flags on the command line, following the special flag --.
+ e.g. ./build/tooling_sample inputs/cfunc_with_if.c -- -v
+ */
 int main(int argc, const char **argv) {
   CommonOptionsParser op(argc, argv, ToolingSampleCategory);
   ClangTool Tool(op.getCompilations(), op.getSourcePathList());

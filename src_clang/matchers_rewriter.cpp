@@ -7,6 +7,11 @@
 //
 // Eli Bendersky (eliben@gmail.com)
 // This code is in the public domain
+
+// Clang tooling developers figured out folks doing AST traversals have to write a lot of repetitive code to find interesting AST nodes,
+// so they came up with a great new API called AST matchers. (declarative)
+
+// Using clang-query to test matchers and explore the AST
 //------------------------------------------------------------------------------
 #include <string>
 
@@ -55,7 +60,7 @@ public:
 
   virtual void run(const MatchFinder::MatchResult &Result) {
     const VarDecl *IncVar = Result.Nodes.getNodeAs<VarDecl>("incVarName");
-    Rewrite.InsertText(IncVar->getLocStart(), "/* increment */", true, true);
+    Rewrite.InsertText(IncVar->getLocStart(), "/* increment */", /*InsertAfter*/true, /*indentNewLines*/true);
   }
 
 private:
@@ -128,3 +133,15 @@ int main(int argc, const char **argv) {
 
   return Tool.run(newFrontendActionFactory<MyFrontendAction>().get());
 }
+
+/*
+RefactoringTool replacements
+The tools I was demonstrating so far used a Rewriter to change the underlying source code in response to finding interesting things in the AST. This is a good approach, but it has a problem scaling for large projects. Imagine running a tool over a large project with many source files and many header files. Some of rewritings may need to happen in the header files, but how to manage that, given that the same headers get included into multiple translation units? Some edits may end up being duplicated or even conflicting, and that's a problem.
+
+Replacements are the solution. The source transformation task is divided into two distinct steps:
+
+Custom tools go through the source base, finding the refactoring patterns to apply, and generating serialized replacements into files. Think of replacements as something like patch files (precise directions of how to modify a source file), but in a somewhat friendlier format.
+clang-apply-replacements can then run with access to all replacements, perform the required de-duplication and conflict resolution and actually apply the changes to the source.
+This approach also allows nice parallelization of the refactoring over huge code-bases, though there aren't many projects and companies in the world with source code large enough to make this a real problem.
+
+ */

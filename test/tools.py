@@ -54,6 +54,7 @@ class SamplesTestCase(unittest.TestCase):
         """
         sample_path = os.path.join(self.build_dir, cmd[0])
         input_path = os.path.join(self.inputs_dir, input)
+        print(sample_path, cmd[1:] + [input_path])
         rc, stdout = run_exe(sample_path, cmd[1:] + [input_path])
         stdout = stdout.decode('utf-8')
         self.assertEqual(rc, 0)
@@ -75,6 +76,7 @@ class SamplesTestCase(unittest.TestCase):
     def assertClangToolOutput(self, cmd, input, expected_out):
         sample_path = os.path.join(self.build_dir, cmd[0])
         input_path = os.path.join(self.inputs_dir, input)
+        print(sample_path, cmd[1:], [input_path], ['--'])
         rc, stdout = run_exe(sample_path, cmd[1:] + [input_path] + ['--'])
         stdout = stdout.decode('utf-8')
         self.assertEqual(rc, 0)

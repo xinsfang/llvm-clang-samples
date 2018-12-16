@@ -3,9 +3,11 @@
 //
 // * How to use RecursiveASTVisitor to find interesting AST nodes.
 // * How to use the Rewriter API to rewrite the source code.
-//
 // Eli Bendersky (eliben@gmail.com)
 // This code is in the public domain
+
+// CompilerInstance -> ASTConsumer -> RecursiveASTVisitor -> Rewriter
+
 //------------------------------------------------------------------------------
 #include <cstdio>
 #include <memory>
@@ -93,8 +95,8 @@ class MyASTConsumer : public ASTConsumer {
 public:
   MyASTConsumer(Rewriter &R) : Visitor(R) {}
 
-  // Override the method that gets called for each parsed top-level
-  // declaration.
+  // Override the method that gets called for each parsed top-level declaration.
+  // gets called by Clang whenever a top-level declaration (which also counts function definitions) is completed.
   virtual bool HandleTopLevelDecl(DeclGroupRef DR) {
     for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)
       // Traverse the declaration using our AST visitor.
@@ -106,6 +108,13 @@ private:
   MyASTVisitor Visitor;
 };
 
+/*
+Our goal is to set up the Clang libraries to parse some source code into an AST, and then let us somehow traverse the AST and modify the source code.
+
+A major challenge in writing a tool using Clang as a library is setting everything up. The Clang frontend is a complex beast and consists of many parts.
+ For the sake of modularity and testability, these parts are decoupled and hence take some work to set up. Fortunately, the Clang developers have provided
+ a convenience class named CompilerInstance that helps with this task by collecting together everything needed to set up a functional Clang-based frontend.
+ */
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     llvm::errs() << "Usage: rewritersample <filename>\n";
@@ -122,6 +131,7 @@ int main(int argc, char *argv[]) {
 
   // Initialize target info with the default triple for our platform.
   auto TO = std::make_shared<TargetOptions>();
+  //The target triple is a string in the format of: CPU_TYPE-VENDOR-OPERATING_SYSTEM or CPU_TYPE-VENDOR-KERNEL-OPERATING_SYSTEM
   TO->Triple = llvm::sys::getDefaultTargetTriple();
   TargetInfo *TI =
       TargetInfo::CreateTargetInfo(TheCompInst.getDiagnostics(), TO);
@@ -131,7 +141,7 @@ int main(int argc, char *argv[]) {
   FileManager &FileMgr = TheCompInst.getFileManager();
   TheCompInst.createSourceManager(FileMgr);
   SourceManager &SourceMgr = TheCompInst.getSourceManager();
-  TheCompInst.createPreprocessor(TU_Module);
+  TheCompInst.createPreprocessor(TU_Module); //enum TranslationUnitKind: TU_Complete, TU_Prefix, TU_Module
   TheCompInst.createASTContext();
 
   // A Rewriter helps us manage the code rewriting task.
@@ -142,6 +152,17 @@ int main(int argc, char *argv[]) {
   const FileEntry *FileIn = FileMgr.getFile(argv[1]);
   SourceMgr.setMainFileID(
       SourceMgr.createFileID(FileIn, SourceLocation(), SrcMgr::C_User));
+
+  /// C_User: Indicates whether a file or directory holds normal user code,
+  /// system code, or system code which is implicitly 'extern "C"' in C++ mode.
+  ///
+  /// Entire directories can be tagged with this (this is maintained by
+  /// DirectoryLookup and friends) as can specific FileInfos when a \#pragma
+  /// system_header is seen or in various other cases.
+  ///
+  //enum CharacteristicKind: C_User, C_System, C_ExternCSystem, C_User_ModuleMap, C_System_ModuleMap
+
+  //inform the diagnostic client that processing of a source file is beginning.
   TheCompInst.getDiagnosticClient().BeginSourceFile(
       TheCompInst.getLangOpts(), &TheCompInst.getPreprocessor());
 

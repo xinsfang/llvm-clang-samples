@@ -1,0 +1,9 @@
+make
+make test
+#make experimental_tools
+
+./build/rewritersample inputs/c_if_and_for.c
+./build/tooling_sample inputs/cfunc_with_if.c -- -v #libTooling
+./build/matchers_rewriter inputs/cfunc_with_if.c
+
+
